@@ -31,6 +31,12 @@
             font-family: 'Liberation Mono';
             font-size: 100%
         }
+
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
     </style>
     <title>EECS 206 Final Project</title>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
@@ -43,10 +49,288 @@
     </h1>
 
     <h2>1 Introduction</h2>
+    <p>
+        <b>Objective</b>. The objective of this project is to prototype a
+        physical therapy system <em>1</em>) for tracking posture of a patient
+        with dysfunctional scapulohumeral rhythm and <em>2</em>) for
+        automatically designing a  rehabilitation workout plan for fast
+        recovery.
+    </p>
+
+    <p>
+        <b>Motivations</b>.
+        The project is interesting in that it uses the model of a robotic arm
+        to represent and plan the motion of the scapulohumeral joints of human.
+        To successfully model a human's scapulohumeral joint, one needs <em>1</em>) to
+        device a sensor that can measure human's posture in real time, <em>2</em>) to
+        calibrate a robotic arm model using sensor data, and finally <em>3</em>) to plan a
+        set of meaningful joint actions using the calibrated model.
+    </p>
+
+    <p>
+        <b>Applications</b>. The most immediate application of such system is
+        to use it to design physical therapy curriculums for patients with
+        weak scapulohumeral joints. Extensions of the project include designing
+        exo-skeleton to aid patients with weak muscular ability, evaluating
+        athletes' form and performance for effective training, and studying
+        how muscles and joints recover over time from a dysfunctional state.
+    </p>
+
     <h2>2 Design</h2>
+
+    <p>
+        <b>Design Criteria</b>. A successful design should be able to accurately
+        measure posture of the subject, to fit the measured data into a sufficiently
+        expressive model, and to plan a meaning set of scapulohumeral actions
+        based on the calibrated model.
+    </p>
+
+    <p>
+        <b>Design Overview</b>. To measure the subject's body posture, we opt to
+        use a Microsofy Azure Kinect camera, which comes with built-in
+        algorithm for real time human body pose estimation. To model the data,
+        we choose to use a 12-DOF robotic arm (see Figure 1), with 3-DOF rotation at chest,
+        clavicle, shoulder, and elbow, respectively. To plan scapulohumeral
+        actions for rehabilitation workout, we use a simple philosophy:
+        exercise joint angles that are not used often to enhance joint
+        flexibility and strength.
+    </p>
+    <figure>
+        <img src="images/scapulohumeral_joint.png" width="450" class="center">
+        <figcaption align="center">
+            <b>Figure 1.</b> 12-DOF scalpulohumeral joint model.
+        </figcaption>
+    </figure>
+
+    <p>
+        A complete schematic of the above design is shown in Figure 2.
+    </p>
+    <figure>
+        <img src="images/system_design.png" width="850" class="center">
+        <figcaption align="center">
+            <b>Figure 2.</b> Ideal system design.
+        </figcaption>
+    </figure>
+
+    <p>
+        <b>Choices and Tradeoffs</b>. For sensing, we choose to prototype our
+        application <em>offline</em> in Python rather than to do it in real time in C++
+        for sake of ease of development, as the camera SDK is currently supported
+        only in C++.
+        For scapulohumeral model, we assume that each joint can free rotate in
+        <img src="http://latex.codecogs.com/gif.latex?\mathbb{R}^{3}" border="0"/>
+        and that the motion of each joint is independent from other joints.
+        While such modelling choice is easy to implement and is the most expressive,
+        it allows for body postures which are awkward or unrealistic for humane being.
+        To plan for scapulohumeral joint positions, we develop a probabilistic
+        model, which again is easy to implement but will occasionally produce
+        unrealistic postures.
+    </p>
+
+    <p>
+        <b>Impacts of Design Choices</b>. Developing in Python, while fast for
+        prototyping, is less computationally efficient for deployment than in
+        C++. An overly expressive model is less robust to noisy sensor measurement
+        since it is difficult to distinguish model errors from irregular data patterns.
+        A probability approach has the problem of balancing between retaining
+        information from past data and updating model distribution with new data,
+        which makes it hard to apply in a general setup.
+    </p>
+
     <h2>3 Implementation</h2>
+    <p>
+        <b>Hardware and Parts</b>. We use a Microsoft Azure Kinect camera to track body
+        posture of the subject, as illustrated in Figure 2.
+        The only other <em>parts</em> we use is a tripod and a clean
+        background to ensure stable visual tracking.
+    </p>
+
+    <p>
+        <b>Software</b>. We use the Kinect SDK body tracking to estimate posture
+        of the subject. To model the scapulohumeral joint and to implement the
+        planning algorithm, we write everything from scratches, using basic
+        numeric libraries in Python such as Numpy, Scipy, and Matplotlib. The
+        architecture of our software implementation is illustrated in Figure 3.
+    </p>
+    <figure>
+        <img src="images/software.png" width="250" class="center">
+        <figcaption align="center">
+            <b>Figure 3.</b> Software architecture.
+        </figcaption>
+    </figure>
+
+    <p>
+        <b>System Integration</b>. The system functions in the following steps:
+        <ol>
+            <li>Use Kinect SDK to record a sequence of body posture from a subject.</li>
+            <li>Load the collected Kinect data into the 12-DOF arm model.</li>
+            <li>Compute joint angles at every time step and find the distribution
+                of each joint.</li>
+            <li>Invert each of the 12 distributions such that a angle with
+                probability density in the original distribution will have low
+                probability density in the inverted distribution.</li>
+            <li>Sample a joint from each of the 12 <em>inverted</em> distributions.</li>
+            <li>Compute the final body posture from the 12 sampled joint angle
+                using forward kinematics.</li>
+        </ol>
+    </p>
+
     <h2>4 Results</h2>
+    <p>
+        We are able to successfully stream data from Kinect camera, to build a
+        12-DOF robotic arm model in Numpy and Scipy, and to illustrate preliminary
+        performance of a pose planner. A high level summary of our findings is
+        provided below.
+    </p>
+    <p>
+        A video recording of body tracking using the Kinect C++ SDK is shown in
+        Video 1. We stream the Kinect camera a predefined set of frames and save
+        the estimated body posture at each frame to a txt file for downstream
+        calibration and planning.
+    </p>
+    <figure>
+        <img src="images/kinect_compressed.gif" width="500" class="center">
+        <figcaption align="center">
+            <b>Video 1.</b> Kinect camera body tracking.
+        </figcaption>
+    </figure>
+    <p>
+        The calibrated 12-DOF robotic arm is visualized in Video 2, where the
+        arm segments are colored in magenta with euler orientations plotted
+        at each joint. Note the data played in Video 2 is using a different
+        source recording from that of Video 1.
+    </p>
+    <figure>
+        <img src="images/kinematics.gif" width="600" class="center">
+        <figcaption align="center">
+            <b>Video 2.</b> Visualization of collected data.
+        </figcaption>
+    </figure>
+    <p>
+        From the model, we compute the angular displacement, velocity, and
+        acceleration of each joint at every frame and use the data to construct
+        a time series plot for each of the three attributes of
+        the 12 joints in the 12-DOF arm. For brevity, we show the plots for the
+        three joints at the right clavicle in Figure 4.
+    </p>
+    <figure>
+        <img src="images/clavicle_timeseries.png" width="600" class="center">
+        <figcaption align="center">
+            <b>Figure 4.</b> Time series of angular displacement, velocity,
+            and acceleration of the three joints along Euler axes at the right
+            clavicle.
+        </figcaption>
+    </figure>
+    <p>
+        As shown in the plots above, the raw velocity and acceleration estimates
+        are unrealistically high, but the angular displacement estimates appear
+        to be very reliable. In a separation unit test, we find the spatial error
+        of Kinect camera is approximately 5 mm.
+    </p>
+    <p>
+        Taking the angular displacement estimates, we are able to construct a
+        probability density function (PDF) and an inverted PDF for each of the
+        three Euler axes, as shown in Figure 5.
+    </p>
+    <figure>
+        <img src="images/clavicle_hist.png" width="600" class="center">
+        <figcaption align="center">
+            <b>Figure 5.</b> PDF (in blue) and inverted PDF (in orange) of
+            angular displacements of the three joints along Euler axes at the
+            right clavicle.
+        </figcaption>
+    </figure>
+    <p>
+        From the plots above, we find that the recommended orange distribution,
+        is the inverse of the underlying blue distribution formed from the data.
+        Sampling from the orange distributions will have the effect of smoothing
+        out blue distribution over time: if an angle less likely to be performed,
+        we will perform that angle more in the workout and if an angle is more
+        likely to be performed, we will perform less in the workout. Therefore,
+        by performing a number of actions described by the orange distributions,
+        we will eventually achieve an uniform usage of all angular positions at
+        every joints in the scapulohumeral region.
+    </p>
+    <p>
+        Finally, we demonstrate how might one recommended action look like
+        using the orange distributions and forward kinematics in Figure 6.
+    </p>
+    <figure>
+        <img src="images/recommend03.png" width="600" class="center">
+        <figcaption align="center">
+            <b>Figure 6.</b> A randomly generated pose used for joint workout
+            of the right scapulohumeral region.
+        </figcaption>
+    </figure>
+    <p>
+        Note that only the right arm is planned. Other parts of the body is
+        assumed a static position in this study.
+        Interestingly, we observe a similarity between the generated pose in
+        Figure 6 to the common stretch pose of a cross stretch in Figure 7.
+    </p>
+    <figure>
+        <img src="images/cross_stretches.jpg" width="300" class="center">
+        <figcaption align="center">
+            <b>Figure 7.</b> Cross stretch.
+        </figcaption>
+    </figure>
+
     <h2>5 Conclusion</h2>
+    <p>
+        <b>Discussions</b>. As shown above, we have demonstrated the feasibility
+        of the project and have met the basic design criteria specified in Section 2.
+        Specifically, we have successfully built a pipeline from streaming data
+        from Kinect camera, to calibrating a arm model with the data, and finally
+        to planning joint actions with the data and the calibrated model.
+        Meanwhile, we also have a better understanding of the problems and limitations
+        in our current implementation. We will continue working on the project
+        beyond the scope of the course to resolve them.
+        As a milestone, we hope to provide a polish demo to be displayed in
+        Rob's lab website, which may serve as a basis for scientific outreach
+        and potential future publications.
+    </p>
+
+    <p>
+        <b>Difficulties</b>. The most difficult part of the project is model
+        calibration, where we need to use the observed data to infer the internal
+        structure and characteristics of the 12-DOF robot arm. Due to
+        under-documentation, it took me a very long time to understand the exact
+        meaning of the Kinect data and therefore to obtain the correct angular
+        positions. Beyond positional estimates, it is also very hard to estimate
+        angular velocity and acceleration, as shown by the unrealistic velocity
+        and acceleration time series in Figure 4. For it to work, we can
+        build a dynamics model of the arm and apply noise rejection using extended
+        Kalman filter.
+    </p>
+    <p>
+        It is also a challenge to ensure that the recommended pose is always
+        natural and physically feasible. Because the model we use does not consider
+        correlations among joints, it is possible to generate actions that look
+        awkward or even impossible for a human to perform. To impose joint
+        correlation, we can either encode it in a dynamics model, or use a
+        hidden Markov chain to capture joint dependency during the sampling step.
+    </p>
+
+    <p>
+        <b>Issues and Improvements</b>. After the presentation, I did a series
+        of testing to see if I have interpreted the Kinect joint orientation
+        data correctly. It is only within the last minutes was I able to
+        identify a parsing issue with the orientation quaternion.
+        In short, the quaternion rotation library in Scipy somehow cannot
+        produce the right conversion. Instead, I find another library, pytransform3d,
+        that can give the right conversion after a 180 degree rotation around the
+        y axis.
+        Consequently, the visualization shown in Section 4 might be
+        slightly off, but the basic idea should remain unchanged. This will be
+        the first thing I need to fix after conclusion of the course project.
+    </p>
+    <p>
+        Lastly, I will finish another idea proposed by Rob this Wednesday to plan
+        in the physical space rather than in the configuration space. Planning in
+        the physical space has the advantage of always able to produce natural
+        action. This idea is relatively tangential to what we have done and
+        therefore requires some time to fully implement.
+    </p>
 
     <h2>6 Team</h2>
     <p>
