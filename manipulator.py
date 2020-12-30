@@ -5,6 +5,7 @@ from utils import Joint, Euler
 from utils import compute_rotation, compute_translation, compute_transform
 from utils import set_axes_equal
 from utils import transform_to_joint
+from utils import sample_histogram
 
 
 class Manipulator:
@@ -29,7 +30,8 @@ class Manipulator:
         }
 
     def set(self, theta):
-        self.theta = theta
+        for key, value in theta.items():
+            self.theta[key] = value
 
     def render(self):
         fig = plt.figure(figsize=(15, 15))
@@ -45,16 +47,12 @@ class Manipulator:
             for parent_tf, parent_index in zip(parents_tf, parents_index):
                 if parent_index in CHILD_INDICES.keys():
                     for child_index in CHILD_INDICES[parent_index]:
-                        # trans = self.tf_data[0][child_index][1]
                         trans = self.trans_data[child_index]
                         euler = self.theta[child_index]
                         parent_p = parent_tf[:3, 3]
                         parent = transform_to_joint(parent_tf)
                         child_tf = compute_transform(parent, trans, euler)
                         child_p = child_tf[:3, 3]
-
-                        # print(child_p)
-                        # print(self.picture_data[0][child_index].p)
 
                         ax.scatter(child_p[0], child_p[1], child_p[2])
                         ax.scatter(parent_p[0], parent_p[1], parent_p[2])
@@ -78,12 +76,6 @@ class Manipulator:
         ax.view_init(azim=270, elev=105, )
         plt.tight_layout()
         plt.show()
-
-    def forward_kinematic(self):
-        raise NotImplementedError
-
-    def backward_kinematic(self, gst):
-        raise NotImplementedError
 
     def calibrate(self, data):
         theta_instances = np.zeros((len(data), 32, 3))
@@ -135,7 +127,22 @@ class Manipulator:
             self.trans_data[index] = \
                 trans_instances[:, index, :].mean(axis=0)
 
-    def sample(self):
+    def sample(self, sample_joints=INDICES_TO_STRINGS.keys(), negate=True):
+        theta = {}
+        for index in sample_joints:
+            hist_z, bins_z = self.theta_prob[index]['z']
+            z = sample_histogram(hist_z, bins_z, negate=negate)
+            hist_y, bins_y = self.theta_prob[index]['y']
+            y = sample_histogram(hist_y, bins_y, negate=negate)
+            hist_x, bins_x = self.theta_prob[index]['x']
+            x = sample_histogram(hist_x, bins_x, negate=negate)
+            theta[index] = Euler(z=z, y=y, x=x)
+        return theta
+
+    def forward_kinematic(self):
+        raise NotImplementedError
+
+    def backward_kinematic(self, gst):
         raise NotImplementedError
 
     def plan(self):

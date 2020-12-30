@@ -7,7 +7,7 @@ from scipy.linalg import expm
 
 plt.rcParams['font.family'] = 'FreeSans'
 plt.rcParams['font.size'] = 12
-np.random.seed(205)
+# np.random.seed(205)
 
 
 class Joint:
@@ -38,7 +38,7 @@ class Joint:
         self.p = np.ones((4,))
         self.p[:3] = np.array(p) / 1000
         self.q = np.array(q)
-        rotation_matrix = matrix_from_quaternion(self.q.as_quat())
+        rotation_matrix = matrix_from_quaternion(self.q)
         if self.reflect:
             y180 = expm(np.array([
                 [0, 0, 1],
@@ -56,7 +56,7 @@ class Joint:
 
 
 class Euler:
-    def __init__(self, z, y, x):
+    def __init__(self, z=0, y=0, x=0):
         self.z = z
         self.y = y
         self.x = x
@@ -75,8 +75,6 @@ def compute_translation(parent, child):
 
 
 def compute_transform(parent, trans, euler):
-    if isinstance(parent, np.ndarray):
-        parent = transform_to_joint(parent)
     transform = \
         expm(np.array([
             [0, -1, 0, 0],
@@ -115,7 +113,7 @@ def transform_to_joint(tf):
     ]) * np.pi)
     rotation_matrix = y180.dot(rotation_matrix)
     q = quaternion_from_matrix(rotation_matrix)
-    return Joint(p=p, q=q, reflect=True)
+    return Joint(p=p, q=q)
 
 
 def negate_histogram(hist, bins):
@@ -125,14 +123,15 @@ def negate_histogram(hist, bins):
     return hist, bins
 
 
-def sample_histogram(hist, bins, num=1):
+def sample_histogram(hist, bins, num=1, negate=False):
+    if negate:
+        hist, bins = negate_histogram(hist, bins)
     bin_midpoints = bins[:-1] + np.diff(bins) / 2
     cdf = np.cumsum(hist)
     cdf = cdf / cdf[-1]
     value = np.random.rand(num)
     value_bin = np.searchsorted(cdf, value)
-    sample = bin_midpoints[value_bin]  # + \
-    #    np.diff(bins)[value_bin] * (np.random.rand() - 0.5)
+    sample = bin_midpoints[value_bin]
     return sample
 
 
