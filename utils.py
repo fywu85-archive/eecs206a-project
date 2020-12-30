@@ -11,35 +11,43 @@ np.random.seed(205)
 
 
 class Joint:
-    def __init__(self, p=np.zeros((3,)), q=np.zeros((4,)), index=''):
+    def __init__(
+            self, p=np.zeros((3,)), q=np.zeros((4,)), index='', reflect=True):
         self.index = index
         self.p = np.ones((4,))
         self.p[:3] = np.array(p) / 1000
         self.q = np.array(q)
         rotation_matrix = matrix_from_quaternion(self.q)
-        y180 = expm(np.array([
-            [0, 0, 1],
-            [0, 0, 0],
-            [-1, 0, 0],
-        ]) * np.pi)
-        self.r = y180.dot(rotation_matrix)
+        if reflect:
+            y180 = expm(np.array([
+                [0, 0, 1],
+                [0, 0, 0],
+                [-1, 0, 0],
+            ]) * np.pi)
+            self.r = y180.dot(rotation_matrix)
+        else:
+            self.r = rotation_matrix
         self.e = euler_zyx_from_matrix(self.r)
         self.t = np.zeros((4, 4))
         self.t[:3, :3] = self.r
         self.t[:, 3] = self.p
         self.t_inv = np.linalg.inv(self.t)
+        self.reflect = reflect
 
     def update(self, p, q):
         self.p = np.ones((4,))
         self.p[:3] = np.array(p) / 1000
         self.q = np.array(q)
         rotation_matrix = matrix_from_quaternion(self.q.as_quat())
-        y180 = expm(np.array([
-            [0, 0, 1],
-            [0, 0, 0],
-            [-1, 0, 0],
-        ]) * np.pi)
-        self.r = y180.dot(rotation_matrix)
+        if self.reflect:
+            y180 = expm(np.array([
+                [0, 0, 1],
+                [0, 0, 0],
+                [-1, 0, 0],
+            ]) * np.pi)
+            self.r = y180.dot(rotation_matrix)
+        else:
+            self.r = rotation_matrix
         self.e = euler_zyx_from_matrix(self.r)
         self.t = np.zeros((4, 4))
         self.t[:3, :3] = self.r
@@ -98,9 +106,16 @@ def compute_transform(parent, trans, euler):
 
 
 def transform_to_joint(tf):
-    p = tf[:3, 3]
-    q = quaternion_from_matrix(tf[:3, :3])
-    return Joint(p, q)
+    p = tf[:3, 3] * 1000
+    rotation_matrix = tf[:3, :3]
+    y180 = expm(np.array([
+        [0, 0, 1],
+        [0, 0, 0],
+        [-1, 0, 0],
+    ]) * np.pi)
+    rotation_matrix = y180.dot(rotation_matrix)
+    q = quaternion_from_matrix(rotation_matrix)
+    return Joint(p=p, q=q, reflect=True)
 
 
 def negate_histogram(hist, bins):

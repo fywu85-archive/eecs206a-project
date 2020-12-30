@@ -4,6 +4,7 @@ import numpy as np
 from utils import Joint, Euler
 from utils import compute_rotation, compute_translation, compute_transform
 from utils import set_axes_equal
+from utils import transform_to_joint
 
 
 class Manipulator:
@@ -23,7 +24,7 @@ class Manipulator:
         self.calibrate(data)
         self.t = 0
         self.theta = {
-            index: Euler(0, 0, 0)
+            index: self.tf_data[0][index][1]
             for index in INDICES_TO_STRINGS.keys()
         }
 
@@ -31,32 +32,29 @@ class Manipulator:
         self.theta = theta
 
     def render(self):
-        self.theta = {
-            index: self.tf_data[0][index][0]
-            for index in INDICES_TO_STRINGS.keys()
-        }
-
         fig = plt.figure(figsize=(15, 15))
         ax = fig.add_subplot(1, 1, 1, projection='3d')
 
-        origin = np.eye(4, 4)
+        origin = Joint()
         parents_index = [PELVIS]
         parents_tf = [compute_transform(
-            origin, self.trans_data[PELVIS], self.theta[PELVIS])]
+            origin, self.tf_data[0][PELVIS][0], self.theta[PELVIS])]
         while len(parents_index) != 0:
             next_parents_index = []
             next_parents_tf = []
             for parent_tf, parent_index in zip(parents_tf, parents_index):
                 if parent_index in CHILD_INDICES.keys():
                     for child_index in CHILD_INDICES[parent_index]:
+                        # trans = self.tf_data[0][child_index][1]
                         trans = self.trans_data[child_index]
                         euler = self.theta[child_index]
                         parent_p = parent_tf[:3, 3]
-                        child_tf = compute_transform(parent_tf, trans, euler)
+                        parent = transform_to_joint(parent_tf)
+                        child_tf = compute_transform(parent, trans, euler)
                         child_p = child_tf[:3, 3]
 
-                        true_parent_p = self.picture_data[0][parent_index].p
-                        true_child_p = self.picture_data[0][child_index].p
+                        # print(child_p)
+                        # print(self.picture_data[0][child_index].p)
 
                         ax.scatter(child_p[0], child_p[1], child_p[2])
                         ax.scatter(parent_p[0], parent_p[1], parent_p[2])
@@ -115,7 +113,7 @@ class Manipulator:
                 child_tf = compute_transform(parent, trans, euler)
                 np.testing.assert_array_almost_equal(child.t, child_tf)
 
-                tf[index] = [euler, trans]
+                tf[index] = [trans, euler]
                 theta_instances[idx, index] = np.array([
                     euler.z, euler.y, euler.x])
                 trans_instances[idx, index] = trans[:-1]
@@ -135,7 +133,7 @@ class Manipulator:
             }
             self.theta_prob[index] = prob
             self.trans_data[index] = \
-                trans_instances[:, index-1, :].mean(axis=0)
+                trans_instances[:, index, :].mean(axis=0)
 
     def sample(self):
         raise NotImplementedError
