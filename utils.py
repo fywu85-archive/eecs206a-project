@@ -7,7 +7,7 @@ from scipy.linalg import expm
 
 plt.rcParams['font.family'] = 'FreeSans'
 plt.rcParams['font.size'] = 12
-# np.random.seed(205)
+# np.random.seed(205)  # Pseudo-randomness for reproducibility
 
 
 class Joint:
@@ -60,6 +60,9 @@ class Euler:
         self.z = z
         self.y = y
         self.x = x
+
+    def to_list(self):
+        return [self.z, self.y, self.x]
 
 
 def compute_rotation(parent, child):
